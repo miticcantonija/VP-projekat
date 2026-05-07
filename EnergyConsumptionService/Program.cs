@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ServiceModel;
 
 namespace EnergyConsumptionService
 {
@@ -10,6 +7,15 @@ namespace EnergyConsumptionService
     {
         static void Main(string[] args)
         {
+            ServiceHost host = new ServiceHost(typeof(EnergyConsumptionServiceImpl));
+
+            host.Open();
+
+            Console.WriteLine("WCF servis je pokrenut.");
+            Console.WriteLine("Pritisni ENTER za kraj...");
+            Console.ReadLine();
+
+            host.Close();
         }
     }
 }

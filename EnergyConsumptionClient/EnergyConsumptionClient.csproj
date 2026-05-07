@@ -34,7 +34,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -48,6 +50,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <Content Include="time_series_15min_singleindex.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\EnergyConsumptionService.Contract\EnergyConsumptionService.Contract.csproj">
+      <Project>{1bddd37b-6e60-4700-95c5-f30f15444721}</Project>
+      <Name>EnergyConsumptionService.Contract</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
