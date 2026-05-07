@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="EnergyConsumptionClient/EnergyConsumptionClient.csproj" Id="504a1473-1bfd-473e-a5fa-7b43cc1a2f9e" />
+  <Project Path="EnergyConsumptionService.Contract/EnergyConsumptionService.Contract.csproj" Id="1bddd37b-6e60-4700-95c5-f30f15444721" />
+  <Project Path="EnergyConsumptionService/EnergyConsumptionService.csproj" Id="36636d57-b4fc-41e4-ada1-7ac024ec8f45" />
+</Solution>
