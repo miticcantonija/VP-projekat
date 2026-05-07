@@ -7,6 +7,7 @@ using System.Linq;
 using System.ServiceModel;
 using EnergyConsumptionService.Contracts;
 
+
 namespace EnergyConsumptionClient
 {
     internal class Program
@@ -74,7 +75,12 @@ namespace EnergyConsumptionClient
 
                 if (actualIndex == -1 || forecastIndex == -1)
                 {
-                    throw new Exception("Ne postoje kolone za državu: " + countryCode);
+                    throw new FaultException<DataFormatFault>(
+                        new DataFormatFault
+                        {
+                            Message = "Ne postoje obe kolone za izabranu zemlju: " + countryCode,
+                            RowIndex = 0
+                        });
                 }
 
                 string line;

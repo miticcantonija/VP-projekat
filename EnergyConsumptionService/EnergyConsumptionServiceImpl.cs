@@ -1,18 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using EnergyConsumptionService.Contracts;
+using System.ServiceModel;
 
 namespace EnergyConsumptionService
 {
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
     public class EnergyConsumptionServiceImpl : IEnergyConsumptionService
     {
         private SessionMeta currentSession;
         private int receivedSamples = 0;
+        private double lastCumulativeMWh = -1;
 
         public void StartSession(SessionMeta meta)
         {
             currentSession = meta;
             receivedSamples = 0;
+            lastCumulativeMWh = -1;
 
             Console.WriteLine("=== START SESSION ===");
             Console.WriteLine("Country: " + meta.CountryCode);
@@ -24,6 +28,71 @@ namespace EnergyConsumptionService
 
         public void PushBatch(List<LoadSample> samples)
         {
+            if (samples == null || samples.Count == 0)
+            {
+                throw new FaultException<DataFormatFault>(
+                    new DataFormatFault
+                    {
+                        Message = "Batch je prazan.",
+                        RowIndex = -1
+                    });
+            }
+
+            foreach (LoadSample sample in samples)
+            {
+                if (sample.TimestampUtc == DateTime.MinValue)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "TimestampUtc nije validan.",
+                            Field = "TimestampUtc"
+                        });
+                }
+
+                if (sample.TimestampLocal == DateTime.MinValue)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "TimestampLocal nije validan.",
+                            Field = "TimestampLocal"
+                        });
+                }
+
+                if (sample.ActualMW < 0)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "ActualMW ne sme biti negativan.",
+                            Field = "ActualMW"
+                        });
+                }
+
+                if (sample.ForecastMW < 0)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "ForecastMW ne sme biti negativan.",
+                            Field = "ForecastMW"
+                        });
+                }
+
+                if (lastCumulativeMWh != -1 && sample.CumulativeMWh < lastCumulativeMWh)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "CumulativeMWh mora monotono da raste.",
+                            Field = "CumulativeMWh"
+                        });
+                }
+
+                lastCumulativeMWh = sample.CumulativeMWh;
+            }
+
             receivedSamples += samples.Count;
 
             Console.WriteLine("Primljen blok uzoraka: " + samples.Count);
