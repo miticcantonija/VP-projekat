@@ -18,6 +18,8 @@ namespace EnergyConsumptionClient
             string selectedDate = ConfigurationManager.AppSettings["SelectedDate"];
             string csvPath = ConfigurationManager.AppSettings["CsvPath"];
             int batchSize = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
+            bool simulateTransferBreak = bool.Parse(ConfigurationManager.AppSettings["SimulateTransferBreak"]);
+            int breakAfterBatches = int.Parse(ConfigurationManager.AppSettings["BreakAfterBatches"]);
 
             List<LoadSample> samples = ReadCsv(csvPath, countryCode, selectedDate);
 
@@ -34,37 +36,81 @@ namespace EnergyConsumptionClient
                 new ChannelFactory<IEnergyConsumptionService>("EnergyConsumptionEndpoint");
 
             IEnergyConsumptionService proxy = factory.CreateChannel();
+            IClientChannel clientChannel = (IClientChannel)proxy;
 
-            proxy.StartSession(meta);
-
-            for (int i = 0; i < samples.Count; i += batchSize)
+            try
             {
-                List<LoadSample> batch = samples
-                    .Skip(i)
-                    .Take(batchSize)
-                    .ToList();
+                proxy.StartSession(meta);
 
-                proxy.PushBatch(batch);
+                int sentBatches = 0;
+
+                for (int i = 0; i < samples.Count; i += batchSize)
+                {
+                    List<LoadSample> batch = samples
+                        .Skip(i)
+                        .Take(batchSize)
+                        .ToList();
+
+                    proxy.PushBatch(batch);
+                    sentBatches++;
+
+                    if (simulateTransferBreak && sentBatches >= breakAfterBatches)
+                    {
+                        throw new Exception("Simuliran prekid prenosa nakon batch-a broj: " + sentBatches);
+                    }
+                }
+
+                proxy.EndSession();
+
+                Console.WriteLine("Klijent je završio slanje.");
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Greška tokom slanja: " + ex.Message);
+            }
+            finally
+            {
+                if (clientChannel.State == CommunicationState.Faulted)
+                {
+                    clientChannel.Abort();
+                    Console.WriteLine("WCF proxy je abortovan.");
+                }
+                else
+                {
+                    clientChannel.Close();
+                    Console.WriteLine("WCF proxy je zatvoren.");
+                }
 
-            proxy.EndSession();
-
-            ((IClientChannel)proxy).Close();
-            factory.Close();
-
-            Console.WriteLine("Klijent je završio slanje.");
+                if (factory.State == CommunicationState.Faulted)
+                {
+                    factory.Abort();
+                    Console.WriteLine("ChannelFactory je abortovan.");
+                }
+                else
+                {
+                    factory.Close();
+                    Console.WriteLine("ChannelFactory je zatvoren.");
+                }
+            }
             Console.ReadLine();
         }
 
         static List<LoadSample> ReadCsv(string path, string countryCode, string selectedDate)
         {
             List<LoadSample> result = new List<LoadSample>();
+            string rejectedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                                               "rejected_client.csv");
 
             string actualColumn = countryCode + "_load_actual_entsoe_transparency";
             string forecastColumn = countryCode + "_load_forecast_entsoe_transparency";
 
-            using (StreamReader reader = new StreamReader(path))
+            using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            using (StreamReader reader = new StreamReader(fileStream))
+            using (FileStream rejectedFileStream = new FileStream(rejectedPath, FileMode.Create, FileAccess.Write))
+            using (StreamWriter rejectedWriter = new StreamWriter(rejectedFileStream))
             {
+                rejectedWriter.WriteLine("RowIndex;Reason;RawLine");
+
                 string headerLine = reader.ReadLine();
                 string[] headers = headerLine.Split(',');
 
@@ -73,12 +119,12 @@ namespace EnergyConsumptionClient
                 int actualIndex = Array.IndexOf(headers, actualColumn);
                 int forecastIndex = Array.IndexOf(headers, forecastColumn);
 
-                if (actualIndex == -1 || forecastIndex == -1)
+                if (utcIndex == -1 || localIndex == -1 || actualIndex == -1 || forecastIndex == -1)
                 {
                     throw new FaultException<DataFormatFault>(
                         new DataFormatFault
                         {
-                            Message = "Ne postoje obe kolone za izabranu zemlju: " + countryCode,
+                            Message = "CSV fajl ne sadrži sve potrebne kolone za zemlju: " + countryCode,
                             RowIndex = 0
                         });
                 }
@@ -93,8 +139,34 @@ namespace EnergyConsumptionClient
 
                     string[] parts = line.Split(',');
 
-                    DateTime timestampUtc = DateTime.Parse(parts[utcIndex], CultureInfo.InvariantCulture);
-                    DateTime timestampLocal = DateTime.Parse(parts[localIndex], CultureInfo.InvariantCulture);
+                    int maxRequiredIndex = Math.Max(Math.Max(utcIndex, localIndex), Math.Max(actualIndex, forecastIndex));
+
+                    if (parts.Length <= maxRequiredIndex)
+                    {
+                        rejectedWriter.WriteLine(rowIndex + ";Nedovoljan broj kolona;" + line);
+                        continue;
+                    }
+
+                    DateTime timestampUtc;
+                    DateTime timestampLocal;
+
+                    bool validUtc = DateTime.TryParse(
+                        parts[utcIndex],
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out timestampUtc);
+
+                    bool validLocal = DateTime.TryParse(
+                        parts[localIndex],
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out timestampLocal);
+
+                    if (!validUtc || !validLocal)
+                    {
+                        rejectedWriter.WriteLine(rowIndex + ";Nevalidan datum;" + line);
+                        continue;
+                    }
 
                     if (timestampLocal.ToString("yyyy-MM-dd") != selectedDate)
                     {
@@ -104,11 +176,42 @@ namespace EnergyConsumptionClient
                     if (string.IsNullOrWhiteSpace(parts[actualIndex]) ||
                         string.IsNullOrWhiteSpace(parts[forecastIndex]))
                     {
+                        rejectedWriter.WriteLine(rowIndex + ";Prazno actual ili forecast polje;" + line);
                         continue;
                     }
 
-                    double actualMW = double.Parse(parts[actualIndex], CultureInfo.InvariantCulture);
-                    double forecastMW = double.Parse(parts[forecastIndex], CultureInfo.InvariantCulture);
+                    double actualMW;
+                    double forecastMW;
+
+                    bool validActual = double.TryParse(
+                        parts[actualIndex],
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out actualMW);
+
+                    bool validForecast = double.TryParse(
+                        parts[forecastIndex],
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out forecastMW);
+
+                    if (!validActual || !validForecast)
+                    {
+                        rejectedWriter.WriteLine(rowIndex + ";Nevalidan broj;" + line);
+                        continue;
+                    }
+
+                    if (double.IsNaN(actualMW) || double.IsNaN(forecastMW))
+                    {
+                        rejectedWriter.WriteLine(rowIndex + ";NaN vrednost;" + line);
+                        continue;
+                    }
+
+                    if (actualMW < 0 || forecastMW < 0)
+                    {
+                        rejectedWriter.WriteLine(rowIndex + ";Negativna actual ili forecast vrednost;" + line);
+                        continue;
+                    }
 
                     double energyMWh = actualMW * 0.25;
                     cumulativeMWh += energyMWh;
