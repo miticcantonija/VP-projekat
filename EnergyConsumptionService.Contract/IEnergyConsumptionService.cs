@@ -14,11 +14,11 @@ namespace EnergyConsumptionService.Contracts
         [OperationContract]
         [FaultContract(typeof(ValidationFault))]
         [FaultContract(typeof(DataFormatFault))]
-        void PushBatch(List<LoadSample> samples);
+        string PushBatch(List<LoadSample> samples);
 
         [OperationContract]
         [FaultContract(typeof(ValidationFault))]
         [FaultContract(typeof(DataFormatFault))]
-        void EndSession();
+        string EndSession();
     }
 }

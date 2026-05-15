@@ -124,7 +124,7 @@ namespace EnergyConsumptionService
             Console.WriteLine("Batch size: " + meta.BatchSize);
         }
 
-        public void PushBatch(List<LoadSample> samples)
+        public string PushBatch(List<LoadSample> samples)
         {
             if (currentSession == null)
             {
@@ -254,16 +254,19 @@ namespace EnergyConsumptionService
 
             Console.WriteLine("Primljen blok uzoraka: " + samples.Count);
             Console.WriteLine("Ukupno primljeno: " + receivedSamples);
+
+            return "Blok primljen. Broj uzoraka u bloku: " + samples.Count +
+       ". Ukupno primljeno: " + receivedSamples;
         }
 
-        public void EndSession()
+        public string EndSession()
         {
             Console.WriteLine("=== END SESSION ===");
 
             if (currentSession != null)
             {
-                Console.WriteLine("Završen prenos za: " + currentSession.CountryCode);
-                Console.WriteLine("Očekivano uzoraka: " + currentSession.TotalSamples);
+                Console.WriteLine("Zavrsen prenos za: " + currentSession.CountryCode);
+                Console.WriteLine("Ocekivano uzoraka: " + currentSession.TotalSamples);
                 Console.WriteLine("Primljeno uzoraka: " + receivedSamples);
 
                 if (receivedSamples != currentSession.TotalSamples)
@@ -271,6 +274,8 @@ namespace EnergyConsumptionService
                     Console.WriteLine("UPOZORENJE: broj uzoraka nije isti.");
                 }
             }
+
+            return "Prenos zavrsen. Ukupno primljeno uzoraka: " + receivedSamples;
         }
 
         private void WriteServerReject(int rowIndex, string reason)

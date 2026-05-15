@@ -51,7 +51,9 @@ namespace EnergyConsumptionClient
                         .Take(batchSize)
                         .ToList();
 
-                    proxy.PushBatch(batch);
+                    string batchResponse = proxy.PushBatch(batch);
+                    Console.WriteLine(batchResponse);
+
                     sentBatches++;
 
                     if (simulateTransferBreak && sentBatches >= breakAfterBatches)
@@ -60,7 +62,8 @@ namespace EnergyConsumptionClient
                     }
                 }
 
-                proxy.EndSession();
+                string endResponse = proxy.EndSession();
+                Console.WriteLine(endResponse);
 
                 Console.WriteLine("Klijent je završio slanje.");
             }
