@@ -106,14 +106,13 @@ namespace EnergyConsumptionClient
             string actualColumn = countryCode + "_load_actual_entsoe_transparency";
             string forecastColumn = countryCode + "_load_forecast_entsoe_transparency";
 
-            using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
-            using (StreamReader reader = new StreamReader(fileStream))
+            using (CsvFileManager csvManager = new CsvFileManager(path))
             using (FileStream rejectedFileStream = new FileStream(rejectedPath, FileMode.Create, FileAccess.Write))
             using (StreamWriter rejectedWriter = new StreamWriter(rejectedFileStream))
             {
                 rejectedWriter.WriteLine("RowIndex;Reason;RawLine");
 
-                string headerLine = reader.ReadLine();
+                string headerLine = csvManager.ReadLine();
                 string[] headers = headerLine.Split(',');
 
                 int utcIndex = Array.IndexOf(headers, "utc_timestamp");
@@ -135,7 +134,7 @@ namespace EnergyConsumptionClient
                 int rowIndex = 1;
                 double cumulativeMWh = 0;
 
-                while ((line = reader.ReadLine()) != null)
+                while ((line = csvManager.ReadLine()) != null)
                 {
                     rowIndex++;
 
