@@ -98,8 +98,10 @@ namespace EnergyConsumptionClient
         static List<LoadSample> ReadCsv(string path, string countryCode, string selectedDate)
         {
             List<LoadSample> result = new List<LoadSample>();
-            string rejectedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                                               "rejected_client.csv");
+            string rejectedPath = Path.Combine(
+     AppDomain.CurrentDomain.BaseDirectory,
+     "rejected_client.csv"
+ );
 
             string actualColumn = countryCode + "_load_actual_entsoe_transparency";
             string forecastColumn = countryCode + "_load_forecast_entsoe_transparency";

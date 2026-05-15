@@ -7,15 +7,39 @@ namespace EnergyConsumptionService
     {
         static void Main(string[] args)
         {
-            ServiceHost host = new ServiceHost(typeof(EnergyConsumptionServiceImpl));
+            ServiceHost host = null;
 
-            host.Open();
+            try
+            {
+                host = new ServiceHost(typeof(EnergyConsumptionServiceImpl));
 
-            Console.WriteLine("WCF servis je pokrenut.");
-            Console.WriteLine("Pritisni ENTER za kraj...");
-            Console.ReadLine();
+                host.Open();
 
-            host.Close();
+                Console.WriteLine("WCF servis je pokrenut.");
+                Console.WriteLine("Pritisni ENTER za kraj...");
+                Console.ReadLine();
+
+                host.Close();
+                Console.WriteLine("WCF servis je pravilno zatvoren.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Greška u radu servisa: " + ex.Message);
+
+                if (host != null)
+                {
+                    host.Abort();
+                    Console.WriteLine("WCF servis je prekinut preko Abort().");
+                }
+            }
+            finally
+            {
+                if (host != null && host.State != CommunicationState.Closed)
+                {
+                    host.Abort();
+                    Console.WriteLine("Resursi ServiceHost-a su oslobođeni.");
+                }
+            }
         }
     }
 }

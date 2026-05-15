@@ -14,6 +14,65 @@ namespace EnergyConsumptionService
 
         public void StartSession(SessionMeta meta)
         {
+            if (meta == null)
+            {
+                throw new FaultException<DataFormatFault>(
+                    new DataFormatFault
+                    {
+                        Message = "Meta podaci nisu poslati."
+                    });
+            }
+
+            if (string.IsNullOrWhiteSpace(meta.CountryCode))
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "CountryCode ne sme biti prazan.",
+                        Field = "CountryCode"
+                    });
+            }
+
+            if (string.IsNullOrWhiteSpace(meta.Date))
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "Date ne sme biti prazan.",
+                        Field = "Date"
+                    });
+            }
+
+            if (string.IsNullOrWhiteSpace(meta.SourceFileName))
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "SourceFileName ne sme biti prazan.",
+                        Field = "SourceFileName"
+                    });
+            }
+
+            if (meta.TotalSamples <= 0)
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "TotalSamples mora biti veći od 0.",
+                        Field = "TotalSamples"
+                    });
+            }
+
+            if (meta.BatchSize <= 0)
+            {
+                throw new FaultException<ValidationFault>(
+                    new ValidationFault
+                    {
+                        Message = "BatchSize mora biti veći od 0.",
+                        Field = "BatchSize"
+                    });
+            }
+
             currentSession = meta;
             receivedSamples = 0;
             lastCumulativeMWh = -1;
@@ -70,6 +129,7 @@ namespace EnergyConsumptionService
                         });
                 }
 
+
                 if (sample.ForecastMW < 0)
                 {
                     throw new FaultException<ValidationFault>(
@@ -87,6 +147,28 @@ namespace EnergyConsumptionService
                         {
                             Message = "CumulativeMWh mora monotono da raste.",
                             Field = "CumulativeMWh"
+                        });
+                }
+
+                if (sample.CountryCode != currentSession.CountryCode)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "Uzorak ne pripada izabranoj zemlji.",
+                            Field = "CountryCode",
+                            
+                        });
+                }
+
+                if (sample.TimestampLocal.Date != DateTime.Parse(currentSession.Date).Date)
+                {
+                    throw new FaultException<ValidationFault>(
+                        new ValidationFault
+                        {
+                            Message = "Uzorak ne pripada izabranom danu.",
+                            Field = "TimestampLocal",
+                           
                         });
                 }
 

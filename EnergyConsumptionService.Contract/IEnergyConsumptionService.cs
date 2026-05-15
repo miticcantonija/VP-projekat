@@ -18,6 +18,7 @@ namespace EnergyConsumptionService.Contracts
 
         [OperationContract]
         [FaultContract(typeof(ValidationFault))]
+        [FaultContract(typeof(DataFormatFault))]
         void EndSession();
     }
 }
