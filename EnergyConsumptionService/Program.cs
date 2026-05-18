@@ -11,7 +11,15 @@ namespace EnergyConsumptionService
 
             try
             {
-                host = new ServiceHost(typeof(EnergyConsumptionServiceImpl));
+                EnergyConsumptionServiceImpl service = new EnergyConsumptionServiceImpl();
+                ServiceEventListener listener = new ServiceEventListener();
+
+                service.OnTransferStarted += listener.OnTransferStartedHandler;
+                service.OnBatchReceived += listener.OnBatchReceivedHandler;
+                service.OnTransferCompleted += listener.OnTransferCompletedHandler;
+                service.OnWarningRaised += listener.OnWarningRaisedHandler;
+
+                host = new ServiceHost(service);
 
                 host.Open();
 

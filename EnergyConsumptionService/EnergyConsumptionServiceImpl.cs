@@ -4,18 +4,50 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.ServiceModel;
+using System.Configuration;
 
 namespace EnergyConsumptionService
 {
     [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
     public class EnergyConsumptionServiceImpl : IEnergyConsumptionService
     {
+        public delegate void TransferEventHandler(object sender, TransferEventArgs e);
+
+        public event TransferEventHandler OnTransferStarted;
+        public event TransferEventHandler OnBatchReceived;
+        public event TransferEventHandler OnTransferCompleted;
+        public event TransferEventHandler OnWarningRaised;
+
+        private double loadFactorMin;
+        private double flatlineEpsilon;
+        private int flatlineWindowSamples;
+        private double spikeDeltaMW;
+
         private SessionMeta currentSession;
         private int receivedSamples = 0;
         private double lastCumulativeMWh = -1;
 
         private string sessionFilePath;
         private string rejectsFilePath;
+
+        public EnergyConsumptionServiceImpl()
+        {
+            LoadConfigurationValues();
+        }
+
+        private void LoadConfigurationValues()
+        {
+            double.TryParse(ConfigurationManager.AppSettings["LoadFactorMin"], NumberStyles.Any, CultureInfo.InvariantCulture, out loadFactorMin);
+            double.TryParse(ConfigurationManager.AppSettings["FlatlineEpsilon"], NumberStyles.Any, CultureInfo.InvariantCulture, out flatlineEpsilon);
+            int.TryParse(ConfigurationManager.AppSettings["FlatlineWindowSamples"], out flatlineWindowSamples);
+            double.TryParse(ConfigurationManager.AppSettings["SpikeDeltaMW"], NumberStyles.Any, CultureInfo.InvariantCulture, out spikeDeltaMW);
+
+            Console.WriteLine("=== CONFIG THRESHOLDS ===");
+            Console.WriteLine("LoadFactorMin: " + loadFactorMin);
+            Console.WriteLine("FlatlineEpsilon: " + flatlineEpsilon);
+            Console.WriteLine("FlatlineWindowSamples: " + flatlineWindowSamples);
+            Console.WriteLine("SpikeDeltaMW: " + spikeDeltaMW);
+        }
 
         public void StartSession(SessionMeta meta)
         {
@@ -122,6 +154,18 @@ namespace EnergyConsumptionService
             Console.WriteLine("Source file: " + meta.SourceFileName);
             Console.WriteLine("Total samples: " + meta.TotalSamples);
             Console.WriteLine("Batch size: " + meta.BatchSize);
+
+            if (OnTransferStarted != null)
+            {
+                OnTransferStarted(
+                    this,
+                    new TransferEventArgs(
+                        "Transfer started for country " + meta.CountryCode + ", date " + meta.Date,
+                        meta.CountryCode,
+                        0
+                    )
+                );
+            }
         }
 
         public string PushBatch(List<LoadSample> samples)
@@ -255,6 +299,18 @@ namespace EnergyConsumptionService
             Console.WriteLine("Primljen blok uzoraka: " + samples.Count);
             Console.WriteLine("Ukupno primljeno: " + receivedSamples);
 
+            if (OnBatchReceived != null)
+            {
+                OnBatchReceived(
+                    this,
+                    new TransferEventArgs(
+                        "Batch received. Samples in batch: " + samples.Count + ". Total received: " + receivedSamples,
+                        currentSession.CountryCode,
+                        samples.Count
+                    )
+                );
+            }
+
             return "Blok primljen. Broj uzoraka u bloku: " + samples.Count +
        ". Ukupno primljeno: " + receivedSamples;
         }
@@ -272,7 +328,31 @@ namespace EnergyConsumptionService
                 if (receivedSamples != currentSession.TotalSamples)
                 {
                     Console.WriteLine("UPOZORENJE: broj uzoraka nije isti.");
+
+                    if (OnWarningRaised != null)
+                    {
+                        OnWarningRaised(
+                            this,
+                            new TransferEventArgs(
+                                "Expected samples: " + currentSession.TotalSamples + ", received samples: " + receivedSamples,
+                                currentSession.CountryCode,
+                                receivedSamples
+                            )
+                        );
+                    }
                 }
+            }
+
+            if (currentSession != null && OnTransferCompleted != null)
+            {
+                OnTransferCompleted(
+                    this,
+                    new TransferEventArgs(
+                        "Transfer completed. Total received samples: " + receivedSamples,
+                        currentSession.CountryCode,
+                        receivedSamples
+                    )
+                );
             }
 
             return "Prenos zavrsen. Ukupno primljeno uzoraka: " + receivedSamples;

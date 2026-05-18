@@ -34,6 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
@@ -48,6 +49,8 @@
     <Compile Include="EnergyConsumptionServiceImpl.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ServiceEventListener.cs" />
+    <Compile Include="TransferEventArgs.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
