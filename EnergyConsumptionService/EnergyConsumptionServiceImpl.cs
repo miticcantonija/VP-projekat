@@ -153,7 +153,7 @@ namespace EnergyConsumptionService
 
             using (StreamWriter writer = new StreamWriter(rejectsFilePath, false))
             {
-                writer.WriteLine("RowIndex;Reason");
+                writer.WriteLine("RowIndex;Reason;OriginalRow");
             }
 
             Console.WriteLine("=== START SESSION ===");
@@ -202,7 +202,7 @@ namespace EnergyConsumptionService
             {
                 if (sample.TimestampUtc == DateTime.MinValue)
                 {
-                    WriteServerReject(sample.RowIndex, "TimestampUtc nije validan");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -214,7 +214,7 @@ namespace EnergyConsumptionService
 
                 if (sample.TimestampLocal == DateTime.MinValue)
                 {
-                    WriteServerReject(sample.RowIndex, "TimestampLocal nije validan");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -226,7 +226,7 @@ namespace EnergyConsumptionService
 
                 if (sample.ActualMW < 0)
                 {
-                    WriteServerReject(sample.RowIndex, "ActualMW negativan");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -238,7 +238,7 @@ namespace EnergyConsumptionService
 
                 if (sample.ForecastMW < 0)
                 {
-                    WriteServerReject(sample.RowIndex, "ForecastMW negativan");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -251,7 +251,7 @@ namespace EnergyConsumptionService
                 if (lastCumulativeMWh != -1 &&
                     sample.CumulativeMWh < lastCumulativeMWh)
                 {
-                    WriteServerReject(sample.RowIndex, "CumulativeMWh nije monoton");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -263,7 +263,7 @@ namespace EnergyConsumptionService
 
                 if (sample.CountryCode != currentSession.CountryCode)
                 {
-                    WriteServerReject(sample.RowIndex, "Pogrešna država");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -276,7 +276,7 @@ namespace EnergyConsumptionService
                 if (sample.TimestampLocal.Date !=
                     DateTime.Parse(currentSession.Date).Date)
                 {
-                    WriteServerReject(sample.RowIndex, "Pogrešan datum");
+                    WriteServerReject(sample, "TimestampUtc nije validan");
 
                     throw new FaultException<ValidationFault>(
                         new ValidationFault
@@ -492,14 +492,22 @@ namespace EnergyConsumptionService
             previousActualMW = sample.ActualMW;
         }
 
-        private void WriteServerReject(int rowIndex, string reason)
+        private void WriteServerReject(LoadSample sample, string reason)
         {
-            if (string.IsNullOrWhiteSpace(rejectsFilePath))
+            if (string.IsNullOrWhiteSpace(rejectsFilePath) || sample == null)
                 return;
+
+            string originalRow =
+                sample.TimestampUtc.ToString("o") + ";" +
+                sample.TimestampLocal.ToString("o") + ";" +
+                sample.ActualMW.ToString(CultureInfo.InvariantCulture) + ";" +
+                sample.ForecastMW.ToString(CultureInfo.InvariantCulture) + ";" +
+                sample.CumulativeMWh.ToString(CultureInfo.InvariantCulture) + ";" +
+                sample.CountryCode;
 
             using (StreamWriter writer = new StreamWriter(rejectsFilePath, true))
             {
-                writer.WriteLine(rowIndex + ";" + reason);
+                writer.WriteLine(sample.RowIndex + ";" + reason + ";" + originalRow);
             }
         }
     }
