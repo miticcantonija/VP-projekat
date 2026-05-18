@@ -23,6 +23,10 @@ namespace EnergyConsumptionService
         private int flatlineWindowSamples;
         private double spikeDeltaMW;
 
+        private double previousActualMW = 0;
+        private bool hasPreviousActualMW = false;
+        private int flatlineCounter = 0;
+
         private SessionMeta currentSession;
         private int receivedSamples = 0;
         private double lastCumulativeMWh = -1;
@@ -125,6 +129,10 @@ namespace EnergyConsumptionService
             currentSession = meta;
             receivedSamples = 0;
             lastCumulativeMWh = -1;
+
+            previousActualMW = 0;
+            hasPreviousActualMW = false;
+            flatlineCounter = 0;
 
             string folderPath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
@@ -279,6 +287,7 @@ namespace EnergyConsumptionService
                 }
 
                 CheckLoadFactor(sample);
+                CheckFlatlineAndSpike(sample);
 
                 using (StreamWriter writer = new StreamWriter(sessionFilePath, true))
                 {
@@ -398,6 +407,89 @@ namespace EnergyConsumptionService
                     );
                 }
             }
+        }
+
+        private void CheckFlatlineAndSpike(LoadSample sample)
+        {
+            if (sample == null)
+            {
+                return;
+            }
+
+            if (double.IsNaN(sample.ActualMW))
+            {
+                return;
+            }
+
+            if (!hasPreviousActualMW)
+            {
+                previousActualMW = sample.ActualMW;
+                hasPreviousActualMW = true;
+                return;
+            }
+
+            double difference = sample.ActualMW - previousActualMW;
+            double absoluteDifference = Math.Abs(difference);
+
+            if (absoluteDifference < flatlineEpsilon)
+            {
+                flatlineCounter++;
+
+                if (flatlineCounter > flatlineWindowSamples)
+                {
+                    if (OnWarningRaised != null)
+                    {
+                        OnWarningRaised(
+                            this,
+                            new TransferEventArgs(
+                                "FlatlineWarning: ActualMW changed less than FlatlineEpsilon for more than configured number of samples.",
+                                sample.CountryCode,
+                                1,
+                                sample.TimestampLocal.Hour,
+                                "FlatlineWarning",
+                                absoluteDifference,
+                                "No significant change"
+                            )
+                        );
+                    }
+                }
+            }
+            else
+            {
+                flatlineCounter = 0;
+            }
+
+            if (absoluteDifference > spikeDeltaMW)
+            {
+                string direction;
+
+                if (difference > 0)
+                {
+                    direction = "Increase";
+                }
+                else
+                {
+                    direction = "Decrease";
+                }
+
+                if (OnWarningRaised != null)
+                {
+                    OnWarningRaised(
+                        this,
+                        new TransferEventArgs(
+                            "ConsumptionSpikeWarning: sudden consumption change detected.",
+                            sample.CountryCode,
+                            1,
+                            sample.TimestampLocal.Hour,
+                            "ConsumptionSpikeWarning",
+                            absoluteDifference,
+                            direction
+                        )
+                    );
+                }
+            }
+
+            previousActualMW = sample.ActualMW;
         }
 
         private void WriteServerReject(int rowIndex, string reason)
