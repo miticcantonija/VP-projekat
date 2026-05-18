@@ -25,6 +25,13 @@ namespace EnergyConsumptionService
         public void OnWarningRaisedHandler(object sender, TransferEventArgs e)
         {
             Console.WriteLine("[WARNING EVENT] " + e.Message);
+
+            if (e.Hour >= 0 && !double.IsNaN(e.LoadFactor))
+            {
+                Console.WriteLine("[WARNING EVENT] CountryCode: " + e.CountryCode);
+                Console.WriteLine("[WARNING EVENT] Hour: " + e.Hour);
+                Console.WriteLine("[WARNING EVENT] LoadFactor: " + e.LoadFactor);
+            }
         }
     }
 }

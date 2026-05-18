@@ -278,6 +278,8 @@ namespace EnergyConsumptionService
                         });
                 }
 
+                CheckLoadFactor(sample);
+
                 using (StreamWriter writer = new StreamWriter(sessionFilePath, true))
                 {
                     writer.WriteLine(
@@ -356,6 +358,46 @@ namespace EnergyConsumptionService
             }
 
             return "Prenos zavrsen. Ukupno primljeno uzoraka: " + receivedSamples;
+        }
+
+        private void CheckLoadFactor(LoadSample sample)
+        {
+            if (sample == null)
+            {
+                return;
+            }
+
+            if (double.IsNaN(sample.ActualMW) || double.IsNaN(sample.ForecastMW))
+            {
+                return;
+            }
+
+            if (sample.ForecastMW == 0)
+            {
+                return;
+            }
+
+            double loadFactor = sample.ActualMW / sample.ForecastMW;
+
+            if (loadFactor < loadFactorMin)
+            {
+                if (OnWarningRaised != null)
+                {
+                    OnWarningRaised(
+                        this,
+                        new TransferEventArgs(
+                            "LowLoadFactorWarning: LoadFactor is below configured minimum. LoadFactor=" +
+                            loadFactor.ToString("F3", CultureInfo.InvariantCulture) +
+                            ", LoadFactorMin=" +
+                            loadFactorMin.ToString("F3", CultureInfo.InvariantCulture),
+                            sample.CountryCode,
+                            1,
+                            sample.TimestampLocal.Hour,
+                            loadFactor
+                        )
+                    );
+                }
+            }
         }
 
         private void WriteServerReject(int rowIndex, string reason)
